@@ -1,0 +1,18 @@
+    // protobuf 3.11.4
+    // python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. auto.proto
+
+
+    syntax = "proto3";
+
+    package autocontrol;
+    service AutoControl {
+        rpc Submit (Request) returns (Response) {}
+    }
+
+    message Request {
+        string cmd = 1;
+    }
+
+    message Response {
+        string json = 1;
+    }

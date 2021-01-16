@@ -1,0 +1,35 @@
+98
+112
+175
+109
+109
+186
+187
+235
+278
+372
+589
+1085
+2104
+4107
+8371
+17259
+34141
+
+test encode_values_16b   ... bench:          98 ns/iter (+/- 2)
+test encode_values_32b   ... bench:         112 ns/iter (+/- 21)
+test encode_values_64b   ... bench:         175 ns/iter (+/- 27)
+test encode_values_128b  ... bench:         109 ns/iter (+/- 9)
+test encode_values_256b  ... bench:         109 ns/iter (+/- 5)
+test encode_values_512b  ... bench:         186 ns/iter (+/- 6)
+test encode_values_1kb   ... bench:         187 ns/iter (+/- 8)
+test encode_values_2kb   ... bench:         235 ns/iter (+/- 13)
+test encode_values_4kb   ... bench:         278 ns/iter (+/- 60)
+test encode_values_8kb   ... bench:         372 ns/iter (+/- 24)
+test encode_values_16kb  ... bench:         589 ns/iter (+/- 64)
+test encode_values_32kb  ... bench:       1,085 ns/iter (+/- 156)
+test encode_values_64kb  ... bench:       2,104 ns/iter (+/- 285)
+test encode_values_128kb ... bench:       4,107 ns/iter (+/- 638)
+test encode_values_256kb ... bench:       8,371 ns/iter (+/- 1,490)
+test encode_values_512kb ... bench:      17,259 ns/iter (+/- 3,845)
+test encode_values_1mb   ... bench:      34,141 ns/iter (+/- 4,530)
