@@ -1,88 +1,56 @@
-import math
+# pip install statsmodels==v0.12.1
+import json
 
-from statsmodels.tsa.stattools import adfuller
 import pandas as pd
+import statsmodels.api as sm
 import matplotlib.pyplot as plt
 
-data = pd.read_csv('Tractor-Sales.csv')
+# index = pd.period_range(start='2000', periods=2, freq='A')
+data = []
+with open('test.txt', 'r') as f:
+    strs = json.load(f)
+    for s in strs:
+        data.append(float(s))
 
-first_rows = data.head(5) # 返回前n条数据,默认返回5条
+data = pd.Series(data)
 
-cols = data.columns # 返回全部列名
 
-dimensison = data.shape # 返回数据的格式，数组，（行数，列数）
-print(dimensison)
-
-data.values # 返回底层的numpy数据
-
-b = data.values[:, 1]
-
-b = pd.Series(b)
-
-# plot(data, xlab='Years', ylab='Tractor Sales')
-
-# b = [10930, 10318, 10595, 10972, 7706, 6756, 9092, 10551, 9722, 10913, 11151, 8186, 6422,
-#      6337, 11649, 11652, 10310, 12043, 7937, 6476, 9662, 9570, 9981, 9331]
-# b = pd.Series(b)
-
-print("Results of Dicky-Fuller Test:")
-dftest = adfuller(b, autolag='AIC')
-
-dfoutput = pd.Series(dftest[0:4], index=['ADF Statistic', 'p-value', '#Lags Used', 'Number of Observations Used'])
-for key, value in dftest[4].items():
-    dfoutput['Critical Value (%s)' % key] = value
-
-print(dfoutput)
-
-from pmdarima.arima import auto_arima
-
-train = b[:100]
-test = b[100:]
-
-res = []
-for i in range(len(test)):
-    train = b[i:i+100]
-    model = auto_arima(train, start_p=1, start_q=1,
-                       max_p=10, max_q=10, m=1,
-                       seasonal=False,
-                       d=0, trace=True,
-                       error_action='warn',
-                       suppress_warnings=True,
-                       stepwise=True)
-    print(model.aic())
-
-    model.fit(train)
-    res.append(model.predict(n_periods=1))
-print(res)
-print(test)
-
-# plt.plot(test)
-# plt.plot(res)
-# plt.legend()
-# plt.show()
-
-# mse = 0.0
-# for i in range(min(len(res), len(test))):
-#     mse += (res[i] - test[i]) * (res[i] - test[i])
+original_observations = data[:9000]
+mod = sm.tsa.SARIMAX(original_observations)
+res = mod.fit()
+print(res.params)
+print('-------------------')
+print(res.fittedvalues)
+print('-------------------')
+print(res.forecast(1))
+print('-------------------')
+# print(original_observations)
 #
-# print(mse)
+# exit(0)
+ori = []
+pre = []
+diff = []
+for i in range(9700, 9900, 2):
+    new_observations = data[i: i+2]
+    # print(new_observations)
+    updated_res = res.append(new_observations.tolist())
+    print(updated_res.params)
+    print('-------------------')
+    print(updated_res.fittedvalues)
+    print('-------------------')
+    print(updated_res.forecast(1))
+    res = updated_res
+    ori.append(data[i+2].tolist())
+    p = updated_res.forecast(1).tolist()[0]
+    pre.append(round(p, 2))
 
+    d = abs(ori[-1] - pre[-1])
+    diff.append(d)
 
-# prediction1 = model.predict(n_periods=20)
-# prediction2 = model.predict(n_periods=20)
-#
-# print(type(train))
-# print(type(test))
-# print(type(prediction1))
-# print(type(prediction2))
-#
-# print(prediction1)
-# print(prediction2)
-#
-# # plot the predictions for validation set
-# plt.plot(train.values, label='train')
-# plt.plot(test.values, label='test')
-# plt.plot(prediction1, label='prediction1')
-# plt.plot(prediction2, label='prediction2')
-# plt.legend()
-# plt.show()
+print(ori)
+plt.plot(ori)
+print(pre)
+plt.plot(pre)
+# print(diff)
+# plt.plot(diff)
+plt.show()

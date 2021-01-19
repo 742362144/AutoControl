@@ -1,4 +1,5 @@
 # coding=utf-8
+import json
 import os
 import socket
 import subprocess
@@ -12,12 +13,12 @@ import grpc
 from json import dumps
 from concurrent import futures
 
-from netutils import get_host_ip, get_docker0_IP
+from auto import get_model, update_model
+from util.util import get_host_ip, get_docker0_IP, runCmd, runCmdAndGetOutput
 
 sys.path.append('%s/' % os.path.dirname(os.path.realpath(__file__)))
 
-from utils import logger
-
+from util import logger
 
 import auto_pb2, auto_pb2_grpc
 
@@ -27,51 +28,135 @@ logger = logger.set_logger(os.path.basename(__file__), LOG)
 
 DEFAULT_PORT = '19999'
 
+resource = {}
 
-class Operation(object):
-    def __init__(self, cmd, params, with_result=False, xml_to_json=False, kv_to_json=False, output=False):
-        if cmd is None or cmd == "":
-            raise Exception("plz give me right cmd.")
-        if not isinstance(params, dict):
-            raise Exception("plz give me right parameters.")
 
-        self.params = params
-        self.cmd = cmd
-        self.params = params
-        self.with_result = with_result
-        self.xml_to_json = xml_to_json
-        self.kv_to_json = kv_to_json
-        self.output = output
+# group = {
+#     'kind': 'group',
+#     'data': {
+#         'gid': 222,
+#         'storage': [
+#             {
+#                 'cid':1,
+#                 'cpu': 2
+#             },
+#             {
+#                 'cid':2,
+#                 'cpu': 2
+#             }
+#         ],
+#         'compute': [
+#             {
+#                 'cid':2,
+#                 'cpu': 2
+#             }
+#         ],
+#     }
+# }
+#
+# set = {
+#     'kind': 'set',
+#     'data': {
+#         'group': 222,
+#         'cid': 1,
+#         'cpu': 2
+#     }
+# }
+#
+# get = {
+#     'kind': 'get',
+#     'data': {
+#         'group': 222,
+#         'cid': 1,
+#         'cpu': 2
+#     }
+# }
 
-    def get_cmd(self):
-        cmd = self.cmd
-        for key in self.params.keys():
-            cmd = "%s --%s %s " % (cmd, key, self.params[key])
-        return cmd
 
-    def execute(self):
-        cmd = self.get_cmd()
-        logger.debug(cmd)
+def parse_group(cmd):
+    data = cmd['data']
+    gid = data['gid']
+    group = {}
+    resource[gid] = group
+    for c in data['storage']:
+        cid = c['cid']
+        cpu = c['cpu']
+        container = {'cpu': cpu, 'kind': 'storage'}
+        group[cid] = container
 
-        if self.with_result:
-            return runCmdWithResult(cmd)
-        elif self.xml_to_json:
-            return runCmdAndTransferXmlToJson(cmd)
-        elif self.kv_to_json:
-            return runCmdAndSplitKvToJson(cmd)
-        elif self.output:
-            return runCmdAndGetOutput(cmd)
+    for c in data['compute']:
+        cid = c['cid']
+        cpu = c['cpu']
+        container = {'cpu': cpu, 'kind': 'compute'}
+        group[cid] = container
+    #
+    # group['storage'] = data['storage']
+    # group['compute'] = data['compute']
+
+
+def parse_set(cmd):
+    data = cmd['data']
+    gid = data['group']
+    if gid in resource.keys():
+        group = resource[gid]
+        cid = data['cid']
+        cpu = data['cpu']
+        if cid not in group.keys():
+            container = {'history': []}
+            group[cid] = container
         else:
-            return runCmd(cmd)
+            container = group[cid]
+
+        # handle data
+        if len(container['history']) < 20:
+            container['history'].extend(cpu)
+        else:
+            container['history'] = container['history'][1:].extend(cpu)
+
+        # update model
+        if 'model' not in container.keys():
+            if len(container['history']) == 20:
+                container['model'] = get_model(container['history'])
+        else:
+            container['model'] = update_model(container['model'], cpu)
+
+        predict = None
+        if 'model' in container.keys():
+            predict = container['model'].forecast(1)
+
+        return predict
+
+
+
+def parse_get(cmd):
+    data = cmd['data']
+    gid = data['group']
+    if gid in resource.keys():
+        group = resource[gid]
+        cid = data['cid']
+        cpu = data['cpu']
+        if cid in group.keys():
+            container = group[cid]
+            container['history'].append(cpu)
+
+
+
+def cmdParser(cmd):
+    cmd = json.loads(cmd)
+    if cmd['kind'] == 'group':
+        parse_group(cmd)
+    elif cmd['kind'] == 'set':
+        parse_set(cmd)
+    elif cmd['kind'] == 'get':
+        parse_get(cmd)
 
 
 class AutoControlServicer(auto_pb2_grpc.AutoControlServicer):
-
     def Submit(self, request, context):
         try:
             cmd = str(request.cmd)
             logger.debug(cmd)
-            op = Operation(cmd, {})
+            op = runCmd(cmd)
             op.execute()
 
             logger.debug(request)
@@ -79,17 +164,12 @@ class AutoControlServicer(auto_pb2_grpc.AutoControlServicer):
                 json=dumps({'result': {'code': 0, 'msg': 'rpc call kubesds-adm cmd %s successful.' % cmd}, 'data': {}}))
         except Exception:
             logger.debug(traceback.format_exc())
-            return auto_pb2.Response(json=dumps({'result': {'code': 1, 'msg': 'rpc call kubesds-adm cmd failure %s' % traceback.format_exc()}, 'data': {}}))
+            return auto_pb2.Response(json=dumps(
+                {'result': {'code': 1, 'msg': 'rpc call kubesds-adm cmd failure %s' % traceback.format_exc()},
+                 'data': {}}))
 
 
 def run_server():
-    # cp k8s config file
-    if os.path.exists('/root/.kube/config') and not os.path.exists('/etc/kubernetes/admin.conf'):
-        try:
-            runCmd('cp -f /root/.kube/config /etc/kubernetes/admin.conf')
-        except:
-            pass
-
     # 多线程服务器
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     # 实例化 计算len的类
@@ -101,24 +181,6 @@ def run_server():
     server.add_insecure_port("%s:%s" % (get_docker0_IP(), DEFAULT_PORT))
     # 开始接收请求进行服务
     server.start()
-
-    # auto mount cstor pool
-    node_name = get_hostname_in_lower_case()
-    pools = get_pools_by_node(node_name)
-    for pool in pools:
-        try:
-            pool_info = get_pool_info_from_k8s(pool['pool'])
-            if pool_info['pooltype'] == 'vdiskfs':
-                if pool_info['state'] == 'active':
-                    pool_active(pool_info['pool'])
-            else:
-                op = Operation('cstor-cli pool-active ', {'poolname': pool['poolname']}, with_result=True)
-                cstor = op.execute()
-                if cstor['result']['code'] != 0 or cstor['data']['status'] != 'active':
-                    logger.debug('can not auto mount cstor pool %s' % pool['poolname'])
-        except ExecuteException, e:
-            logger.debug('can not auto mount cstor pool %s' % pool['poolname'])
-
 
     return server
     # 使用 ctrl+c 可以退出服务
@@ -133,34 +195,13 @@ def run_server():
 def keep_alive():
     server = run_server()
     server.wait_for_termination()
-    # while True:
-    #     time.sleep(5)
 
-    # while True:
-    #     output = None
-    #     try:
-    #         output = runCmdAndGetOutput('netstat -anp|grep %s:%s' % (get_docker0_IP(), DEFAULT_PORT))
-    #     except ExecuteException:
-    #         logger.debug(traceback.format_exc())
-    #     if output is not None and output.find('%s:%s' % (get_docker0_IP(), DEFAULT_PORT)) >= 0:
-    #         # logger.debug("port 19999 is alive")
-    #         pass
-    #     else:
-    #         # try stop server
-    #         try:
-    #             server.stop(0)
-    #         except Exception:
-    #             logger.debug(traceback.format_exc())
-    #         # restart server
-    #         server = run_server()
-    #         logger.debug("restart port %s..." % DEFAULT_PORT)
-    #     time.sleep(1)
 
 def stop():
     output = None
     try:
         output = runCmdAndGetOutput('ps -ef|grep kubesds-rpc-service')
-    except ExecuteException:
+    except Exception:
         logger.debug(traceback.format_exc())
     if output:
         lines = output.splitlines()
@@ -170,10 +211,11 @@ def stop():
             pid = lines[0].split()[1]
             runCmd('kill -9 %s' % pid)
 
+
 def daemonize():
     help_msg = 'Usage: python %s <start|stop|restart|status>' % sys.argv[0]
     if len(sys.argv) != 2:
-        print help_msg
+        print(help_msg)
         sys.exit(1)
     pid_fn = '/var/run/kubesds-rpc.pid'
     log_fn = '/var/log/kubesds-rpc.log'
@@ -186,8 +228,8 @@ def daemonize():
         stop()
         keep_alive()
     else:
-        print 'invalid argument!'
-        print help_msg
+        print('invalid argument!')
+        print(help_msg)
 
 
 if __name__ == '__main__':

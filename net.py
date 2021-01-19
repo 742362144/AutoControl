@@ -11,68 +11,6 @@ TOTAL_MEM_USAGE = 8 * 1024 * 1024
 data_size = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576]
 
 
-def runCmd(cmd):
-    if not cmd:
-        #         logger.debug('No CMD to execute.')
-        return
-    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    try:
-        std_out = p.stdout.readlines()
-        std_err = p.stderr.readlines()
-        msg = ''
-        if std_out:
-            for index, line in enumerate(std_out):
-                if not str.strip(line.decode("utf-8")):
-                    continue
-                if index == len(std_out) - 1:
-                    msg = msg + str.strip(line.decode("utf-8")) + '. '
-                else:
-                    msg = msg + str.strip(line.decode("utf-8")) + ', '
-        p.wait()
-
-        if std_err:
-            msg = ''
-            for index, line in enumerate(std_err):
-                msg = msg + line.decode("utf-8")
-            if msg.strip() != '' and p.returncode != 0:
-                raise Exception
-        return msg
-    finally:
-        p.stdout.close()
-        p.stderr.close()
-
-
-def runCmdAndGetOutput(cmd):
-    if not cmd:
-        return
-
-    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    try:
-        std_out = p.stdout.readlines()
-        std_err = p.stderr.readlines()
-        if std_out:
-            msg = ''
-            for line in std_out:
-                msg = msg + line.decode("utf-8")
-            return msg
-        if std_err:
-            traceback.print_exc()
-            msg = ''
-            for index, line in enumerate(std_err):
-                if not str.strip(line.decode("utf-8")):
-                    continue
-                else:
-                    msg = msg + str.strip(line.decode("utf-8")) + ', '
-            if msg.strip() != '':
-                print(msg)
-                raise Exception()
-    except Exception:
-        traceback.print_exc()
-    finally:
-        p.stdout.close()
-        p.stderr.close()
-
-
 def idle():
     times = 100
     cid = start_redis()
