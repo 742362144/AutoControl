@@ -24,6 +24,7 @@ def get_host_ip():
 
 
 def runCmd(cmd):
+    print(cmd)
     if not cmd:
         #         logger.debug('No CMD to execute.')
         return
@@ -37,16 +38,21 @@ def runCmd(cmd):
                 if not str.strip(line.decode("utf-8")):
                     continue
                 if index == len(std_out) - 1:
-                    msg = msg + str.strip(line.decode("utf-8")) + '. '
+                    line = str.strip(line.decode("utf-8")) + '. '
+                    msg = msg + line
                 else:
-                    msg = msg + str.strip(line.decode("utf-8")) + ', '
+                    line = str.strip(line.decode("utf-8")) + ', '
+                    msg = msg + line
+                print(line)
+
         p.wait()
 
         if std_err:
-            msg = ''
+            error_msg = ''
             for index, line in enumerate(std_err):
-                msg = msg + line.decode("utf-8")
-            if msg.strip() != '' and p.returncode != 0:
+                error_msg = error_msg + line.decode("utf-8")
+            if error_msg.strip() != '' and p.returncode != 0:
+                print(error_msg)
                 raise Exception
         return msg
     finally:
@@ -55,6 +61,7 @@ def runCmd(cmd):
 
 
 def runCmdAndGetOutput(cmd):
+    print(cmd)
     if not cmd:
         return
 
@@ -66,17 +73,19 @@ def runCmdAndGetOutput(cmd):
             msg = ''
             for line in std_out:
                 msg = msg + line.decode("utf-8")
+                print(line.decode("utf-8"))
             return msg
         if std_err:
             traceback.print_exc()
-            msg = ''
+            error_msg = ''
             for index, line in enumerate(std_err):
                 if not str.strip(line.decode("utf-8")):
                     continue
                 else:
-                    msg = msg + str.strip(line.decode("utf-8")) + ', '
-            if msg.strip() != '':
-                print(msg)
+                    line = str.strip(line.decode("utf-8")) + ', '
+                    error_msg = error_msg + line
+            if error_msg.strip() != '':
+                print(error_msg)
                 raise Exception()
     except Exception:
         traceback.print_exc()

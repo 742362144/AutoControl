@@ -13,7 +13,7 @@ import grpc
 from json import dumps
 from concurrent import futures
 
-from auto import get_model, update_model
+from auto import Model
 from util.util import get_host_ip, get_docker0_IP, runCmd, runCmdAndGetOutput
 
 sys.path.append('%s/' % os.path.dirname(os.path.realpath(__file__)))
@@ -22,11 +22,11 @@ from util import logger
 
 import auto_pb2, auto_pb2_grpc
 
-LOG = "/var/log/kubesds-rpc.log"
+LOG = "/var/log/auto.log"
 
 logger = logger.set_logger(os.path.basename(__file__), LOG)
 
-DEFAULT_PORT = '19999'
+DEFAULT_PORT = '8090'
 
 resource = {}
 
@@ -74,96 +74,135 @@ resource = {}
 
 
 def parse_group(cmd):
-    data = cmd['data']
-    gid = data['gid']
-    group = {}
-    resource[gid] = group
-    for c in data['storage']:
-        cid = c['cid']
-        cpu = c['cpu']
-        container = {'cpu': cpu, 'kind': 'storage'}
-        group[cid] = container
-
-    for c in data['compute']:
-        cid = c['cid']
-        cpu = c['cpu']
-        container = {'cpu': cpu, 'kind': 'compute'}
-        group[cid] = container
+    print(cmd)
+    gid = cmd['gid']
+    resource[gid] = cmd
     #
     # group['storage'] = data['storage']
     # group['compute'] = data['compute']
 
 
+# def parse_set(cmd):
+#     gid = cmd['group']
+#     print(1)
+#     predict = None
+#     if gid in resource.keys():
+#         group = resource[gid]
+#         cid = cmd['cid']
+#         cpu = cmd['cpu']
+#         if cid not in group.keys():
+#             container = {'history': []}
+#             group[cid] = container
+#         else:
+#             container = group[cid]
+#         print(2)
+#
+#         # handle data
+#         if len(container['history']) < 20:
+#             print(2.1)
+#             container['history'].extend(cpu)
+#         elif len(container['history']) > 30:
+#             print(2.2)
+#             container['history'] = container['history'][1:].extend(cpu)
+#
+#         print(3)
+#         # update model
+#         print('container %s update model....' % cid)
+#         if 'model' not in container.keys():
+#             if len(container['history']) >= 20:
+#                 container['model'] = get_model(container['history'])
+#         else:
+#             container['model'] = update_model(container['model'], cpu)
+#
+#         print(4)
+#         if 'model' in container.keys():
+#             predict = container['model'].forecast(1)
+#         else:
+#             print('not have enough data')
+#         print(5)
+#     else:
+#         print('warning: unknown group!!!')
+#     return predict
+
 def parse_set(cmd):
-    data = cmd['data']
-    gid = data['group']
+    # print(resource)
+    gid = cmd['group']
+    predict = None
     if gid in resource.keys():
         group = resource[gid]
-        cid = data['cid']
-        cpu = data['cpu']
-        if cid not in group.keys():
-            container = {'history': []}
-            group[cid] = container
-        else:
-            container = group[cid]
+        cid = cmd['cid']
+        cpu = cmd['cpu']
 
-        # handle data
+        container = group[cid]
+        if 'history' not in container.keys():
+            container['history'] = []
+
+        # container['history'].extend(cpu)
         if len(container['history']) < 20:
             container['history'].extend(cpu)
-        else:
-            container['history'] = container['history'][1:].extend(cpu)
+        # elif len(container['history']) > 30:
+        #     # print(2.2)
+        #     container['history'] = container['history'][-20:].extend(cpu)
 
-        # update model
+        # print('%s %s' % (cid, dumps(container['history'])))
+
         if 'model' not in container.keys():
-            if len(container['history']) == 20:
-                container['model'] = get_model(container['history'])
+            if len(container['history']) >= 10:
+                container['model'] = Model(container['history'])
         else:
-            container['model'] = update_model(container['model'], cpu)
+            print('container %s update model....' % cid)
+            predict = container['model'].update_model(cpu)
 
-        predict = None
-        if 'model' in container.keys():
-            predict = container['model'].forecast(1)
-
-        return predict
-
+        # # update model
+        # if 'model' in container.keys():
+        #     print(group.keys())
+        #     predict = container['model'].forecast(1)
+        #     print('container %s predict: %s' % (cid, predict))
+        # else:
+        #     print(len(container['history']))
+    else:
+        print('warning: unknown group!!!')
+    # print('predict: %s' % predict)
+    return predict
 
 
 def parse_get(cmd):
-    data = cmd['data']
-    gid = data['group']
+    gid = cmd['group']
     if gid in resource.keys():
         group = resource[gid]
-        cid = data['cid']
-        cpu = data['cpu']
+        cid = cmd['cid']
+        cpu = cmd['cpu']
         if cid in group.keys():
             container = group[cid]
             container['history'].append(cpu)
 
 
-
-def cmdParser(cmd):
+def cmd_parser(cmd):
     cmd = json.loads(cmd)
     if cmd['kind'] == 'group':
-        parse_group(cmd)
+        # print('parse group %s' % cmd)
+        return parse_group(cmd)
     elif cmd['kind'] == 'set':
-        parse_set(cmd)
+        # print('parse set %s' % cmd)
+        return parse_set(cmd)
     elif cmd['kind'] == 'get':
-        parse_get(cmd)
+        return parse_get(cmd)
 
 
 class AutoControlServicer(auto_pb2_grpc.AutoControlServicer):
     def Submit(self, request, context):
         try:
             cmd = str(request.cmd)
-            logger.debug(cmd)
-            op = runCmd(cmd)
-            op.execute()
-
-            logger.debug(request)
-            return auto_pb2.Response(
-                json=dumps({'result': {'code': 0, 'msg': 'rpc call kubesds-adm cmd %s successful.' % cmd}, 'data': {}}))
+            # print(request)
+            predict = cmd_parser(cmd)
+            if predict:
+                print('predict: %s' % predict)
+                res = dumps({'result': {'code': 0, 'msg': 'successful'}, 'data': {'predict': predict}})
+            else:
+                res = dumps({'result': {'code': 0, 'msg': 'successful'}, 'data': {}})
+            return auto_pb2.Response(json=res)
         except Exception:
-            logger.debug(traceback.format_exc())
+            print(traceback.format_exc())
             return auto_pb2.Response(json=dumps(
                 {'result': {'code': 1, 'msg': 'rpc call kubesds-adm cmd failure %s' % traceback.format_exc()},
                  'data': {}}))

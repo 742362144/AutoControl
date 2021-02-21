@@ -1,17 +1,25 @@
 # pip install statsmodels==v0.12.1
 import datetime
 import json
+import os
 import time
 
 import docker
 import pandas as pd
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
+import multiprocessing as mp
 
 # pip install py-cpuinfo
 # https://stackoverflow.com/questions/4842448/getting-processor-information-in-python
 import cpuinfo
 from util.util import runCmdAndGetOutput
+from util import logger
+
+
+LOG = "/var/log/auto.log"
+
+logger = logger.set_logger(os.path.basename(__file__), LOG)
 
 
 def get_model(data):
@@ -21,17 +29,28 @@ def get_model(data):
     return res
 
 
-def update_model(model, data):
-    # new_observations = pd.Series(data, index=index+1)
-    # print(new_observations)
-    updated_res = model.append(data)
-    # print(updated_res.params)
-    # print('-------------------')
-    # print(updated_res.fittedvalues)
-    # print('-------------------')
-    # print(updated_res.forecast(1))
-    return updated_res
+class Model(object):
+    def __init__(self, data):
+        self.lock = mp.Lock()
+        self.model = get_model(data)
 
+    def update_model(self, data):
+        # new_observations = pd.Series(data, index=index+1)
+        # print(new_observations)
+        logger.debug('appending data')
+        # self.lock.acquire()
+        updated_res = self.model.append(data, refit=True)
+        # updated_res = self.model.append(data)
+        # self.lock.release()
+        logger.debug('finish append data')
+        # print(updated_res.params)
+        # print('-------------------')
+        # print(updated_res.fittedvalues)
+        # print('-------------------')
+        # print(updated_res.forecast(1))
+        predict = updated_res.forecast(1)
+        self.model = updated_res
+        return predict.tolist()[0]
 
 def get_container_stat(id):
     # print('get_container_stat: id %s' % id)
@@ -41,6 +60,47 @@ def get_container_stat(id):
         if c.id.find(id) == 0:
             cpu = c.stats(stream=False)
             return cpu
+
+
+def get_container_stats_stream(id):
+    client = docker.DockerClient(base_url='unix:///var/run/docker.sock')
+    for c in client.containers.list():
+        if c.id.find(id) == 0:
+            return c.stats(stream=True, decode=True)
+
+
+def parallel_container_stat():
+    import multiprocessing as mp
+    output = mp.Queue()
+
+    lock = mp.Lock()
+
+    def stats(server, lock):
+        client = docker.from_env()
+        client_lowlevel = docker.APIClient(base_url='unix://var/run/docker.sock')
+        client_stats = client_lowlevel.stats(container=server, stream=False)
+        output.put(client_stats)
+
+    processes = [mp.Process(target=stats, args=(server, lock)) for server in ('d1526144706d', '2b02193ba7dd')]
+
+    # Run processes
+    for p in processes:
+        p.start()
+
+    # Exit the completed processes
+    for p in processes:
+        p.join()
+
+    print(output.get())
+    print(output.get())
+
+
+# def test(id):
+#     client = docker.DockerClient(base_url='unix:///var/run/docker.sock')
+#     for c in client.containers.list():
+#         if c.id.find(id) == 0:
+#             for i in c.stats(stream=True):
+#                 print(i)
 
 
 def get_time(utc):
@@ -77,6 +137,7 @@ def get_container_config(id):
 
     return client.api.inspect_container(id)['HostConfig']
 
+
 # def get_container_config(id):
 #     output = runCmdAndGetOutput('docker inspect %s' % id)
 #     print(output)
@@ -85,16 +146,19 @@ def get_container_config(id):
 #     print(json.dumps(HostConfig))
 
 # api https://docker-py.readthedocs.io/en/stable/containers.html
-def update_container():
+def update_container(cid, target, MAX_CPU=None):
     client = docker.DockerClient(base_url='unix:///var/run/docker.sock')
-    for c in client.containers.list():
-        if c.id.find(id) == 0:
-            # cpu = c.stats(stream=False)
-            c.update(blkio_weight=1, cpu_period=1, cpu_quota=1, cpu_shares=1, cpuset_cpus='', cpuset_mems='',
-                     mem_reservation=1, memswap_limit=1, kernel_memory=1, restart_policy=dict)
-            # c.update(blkio_weight=1, cpu_period=1, cpu_quota=1, cpu_shares=1, cpuset_cpus='', cpuset_mems='',
-            #          mem_reservation=1, memswap_limit=1, kernel_memory=1, restart_policy=dict)
-            # return cpu['cpu_stats']
+    if MAX_CPU and target <= MAX_CPU:
+        client.api.update_container(container=cid, cpu_quota=int(target * 1000000000))
+    # for c in client.containers.list():
+    #     if c.id.find(id) == 0:
+    #         # cpu = c.stats(stream=False)
+    #         c.update(blkio_weight=1, cpu_period=1, cpu_quota=1, cpu_shares=1, cpuset_cpus='', cpuset_mems='',
+    #                  mem_reservation=1, memswap_limit=1, kernel_memory=1, restart_policy=dict)
+    #         # c.update(blkio_weight=1, cpu_period=1, cpu_quota=1, cpu_shares=1, cpuset_cpus='', cpuset_mems='',
+    #         #          mem_reservation=1, memswap_limit=1, kernel_memory=1, restart_policy=dict)
+    #         # return cpu['cpu_stats']
+
 
 def get_cpu_speed():
     # print( cpuinfo.get_cpu_info())
@@ -103,7 +167,16 @@ def get_cpu_speed():
     return float(cpu.strip().split()[-1].replace('GHz', '')) * 1000000000
 
 
+def get_all_container():
+    res = []
+    client = docker.DockerClient(base_url='unix:///var/run/docker.sock')
+    for c in client.containers.list():
+        res.append(c.short_id)
+    return res
 
+# parallel_container_stat()
+
+# print(get_all_container())
 
 # data = get_container_stat('2b02193ba7dd')
 #

@@ -4,12 +4,14 @@ import time
 import traceback
 from concurrent.futures.thread import ThreadPoolExecutor
 from configparser import ConfigParser
-from json import loads
+from json import loads, dumps
 from threading import Thread
 
+import docker
 import grpc
 
-from auto import get_container_stat, calculate_time, get_container_config
+from auto import get_container_stat, calculate_time, get_container_config, get_all_container, calculate_cpu_percent, \
+    get_container_stats_stream, update_container
 from util import logger
 
 import auto_pb2
@@ -17,11 +19,11 @@ import auto_pb2_grpc
 
 from util.util import get_docker0_IP
 
-LOG = "/var/log/cmdrpc-cli.log"
+LOG = "/var/log/auto.log"
 
 logger = logger.set_logger(os.path.basename(__file__), LOG)
 
-DEFAULT_PORT = '19999'
+DEFAULT_PORT = '8090'
 
 
 def submit(cmd):
@@ -88,23 +90,11 @@ def submit(cmd):
 # }
 
 
-def submit_group(group):
-    # init group
-    # group
-
-    # submit stat
-    while True:
-        stat = get_container_stat(id)
-        cpu_percent = calculate_time(stat)
-        set = {
-            'kind': 'set',
-            'data': {
-                'group': 222,
-                'cid': 1,
-                'cpu': [2]
-            }
-        }
-        submit()
+def submit_group():
+    groups = get_all_group()
+    for gid in groups.keys():
+        submit(dumps(groups[gid]))
+    return groups
 
 
 def get_all_group():
@@ -114,25 +104,126 @@ def get_all_group():
     config_raw.read(cfg)
     groups = {}
     # ch = config_raw.sections()
-    for g in config_raw['groups'].keys():
+    cons = get_all_container()
+    for gid in config_raw['groups'].keys():
         # print()
-        groups[g] = loads(config_raw.get('groups', g))
-
+        g_config = loads(config_raw.get('groups', gid))
+        config_storage = g_config['storage']
+        config_compute = g_config['compute']
+        print(g_config)
         # set origin cpu limit
-        config = get_container_config('d1526144706d')
-        limit = config['NanoCpus'] / 1000000000
+        group = {
+            'kind': 'group',
+            'gid': gid
+        }
+        for cid in config_storage:
+            if cid in cons:
+                config = get_container_config(cid)
+                limit = config['NanoCpus'] / 1000000000
+                group[cid] = {
+                    'kind': 'storage',
+                    'limit': limit
+                }
+
+        for cid in config_compute:
+            if cid in cons:
+                config = get_container_config(cid)
+                limit = config['NanoCpus'] / 1000000000
+                group[cid] = {
+                    'kind': 'compute',
+                    'limit': limit
+                }
+        groups[gid] = group
     return groups
 
 
-groups = get_all_group()
+def parallel_submit(group):
+    import multiprocessing as mp
 
-for gid in groups.keys():
-    submit_group(groups[gid])
+    lock = mp.Lock()
+    gid = group['gid']
+
+    def stats(group, cid, lock):
+        MAX_CPU = group[cid]['limit']
+        stream = get_container_stats_stream(cid)
+
+        count = 0
+        usage = []
+        predict = []
+        for stat in stream:
+            # print(stat)
+            # print(type(stat))
+            u, p = submit_container(gid, cid, stat, MAX_CPU)
+            usage.append(u)
+            predict.append(p)
+            count = count + 1
+            if count > 2000:
+                print('container: %s' % cid)
+                with open('usage.txt', 'w') as f:
+                    f.write(dumps(usage))
+                with open('predict.txt', 'w') as f:
+                    f.write(dumps(predict))
+                return
+
+    processes = []
+    for cid in group.keys():
+        if cid in ['gid', 'kind']:
+            pass
+        processes.append(mp.Process(target=stats, args=(group, cid, lock)))
+
+    # Run processes
+    for p in processes:
+        p.start()
+
+    # Exit the completed processes
+    for p in processes:
+        p.join()
 
 
+def submit_container(gid, cid, stat, MAX_CPU):
+    set = {
+        'kind': 'set',
+        'group': gid,
+        'cid': cid
+    }
+    predict = None
+    cpu = []
+    set['cpu'] = cpu
+    usage = None
+    try:
+        usage = calculate_cpu_percent(stat)
+        # print(usage)
+        cpu.append(usage)
+    except Exception:
+        traceback.print_exc()
+    if usage is None:
+        print('error: %s' % dumps(stat))
+    else:
+        try:
+            res = submit(dumps(set))
+            # print(res)
+            if 'predict' in res['data'].keys():
+                predict = res['data']['predict']
+                print('predict: %s' % predict)
+                print('usage: %s' % usage)
+                update_container(cid, predict, MAX_CPU)
+
+        except Exception:
+            traceback.print_exc()
+    return usage, predict
 
 
+def run_service():
+    groups = submit_group()
+    for gid in groups.keys():
+        print('start subbmit group %s' % gid)
+        parallel_submit(groups[gid])
 
+    while True:
+        time.sleep(5)
+
+
+run_service()
 
 # print(get_all_group())
 
