@@ -22,6 +22,9 @@ def predict():
         usage = json.load(f)
     with open('predict.txt', 'r') as f:
         predict = json.load(f)
+
+    print(usage[30:115])
+    print(predict[30:115])
     plt.plot(usage[30:115])
     plt.plot(predict[30:115])
     plt.show()
