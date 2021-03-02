@@ -18,18 +18,5 @@
 #
 # docker commit d1526144706d ycsb-redis:1.0
 # docker save -o ycsb-redis.img ycsb-redis:1.0
-import docker
 
-
-# api https://docker-py.readthedocs.io/en/stable/containers.html
-def update_container():
-    client = docker.DockerClient(base_url='unix:///var/run/docker.sock')
-    for c in client.containers.list():
-        if c.id.find(id) == 0:
-            # cpu = c.stats(stream=False)
-            c.update(blkio_weight=1, cpu_period=1, cpu_quota=1, cpu_shares=1, cpuset_cpus='', cpuset_mems='',
-                     mem_reservation=1, memswap_limit=1, kernel_memory=1, restart_policy=dict)
-            # c.update(blkio_weight=1, cpu_period=1, cpu_quota=1, cpu_shares=1, cpuset_cpus='', cpuset_mems='',
-            #          mem_reservation=1, memswap_limit=1, kernel_memory=1, restart_policy=dict)
-            # return cpu['cpu_stats']
 

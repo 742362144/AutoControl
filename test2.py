@@ -9,10 +9,18 @@ import matplotlib.pyplot as plt
 
 data = []
 with open('test.txt', 'r') as f:
-    data = json.load(f)
+    strs = json.load(f)
+    for s in strs:
+        data.append(float(s))
 
 data = pd.Series(data)
 
+# plt.plot(data[-100:].tolist(), 'r--',label='type1')
+#
+# plt.show()
+#
+# print(data[-100:].tolist())
+# exit(0)
 
 first_rows = data.head(5) # 返回前n条数据,默认返回5条
 
@@ -50,7 +58,7 @@ test = b[9950:]
 
 res = []
 for i in range(len(test)):
-    train = b[i:i+100]
+    train = b[9900+i:9950 + i]
     model = auto_arima(train, start_p=1, start_q=1,
                        max_p=10, max_q=10, m=1,
                        seasonal=False,
