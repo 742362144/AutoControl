@@ -9,6 +9,13 @@
           </mappings>
         </serverdata>
       </paths>
+      <paths name="root@133.133.135.22:22 (1)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/AutoControl" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
     </serverData>
   </component>
 </project>
