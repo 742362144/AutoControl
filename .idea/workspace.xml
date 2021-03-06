@@ -1,20 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="2f21e604-acab-4d91-a8f8-0b1b07ada96c" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/docker/ui/grafana-tutorial-master/README.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docker/ui/grafana-tutorial-master/docker-compose.yml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docker/ui/grafana-tutorial-master/grafana.ini" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docker/ui/grafana-tutorial-master/prometheus.yml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docker/ui/grafana-tutorial-master/start.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docker/web/Dockerfile" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docker/web/build.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docker/web/prometheus.yml/prometheus.yml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/pic/arima2.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/pic/cpu100.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test3.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/deployment.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/deployment.xml" afterDir="false" />
-    </list>
+    <list default="true" id="2f21e604-acab-4d91-a8f8-0b1b07ada96c" name="Default Changelist" comment="" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -61,7 +48,7 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/test2.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="516">
+            <state relative-caret-position="504">
               <caret line="47" column="78" selection-start-line="47" selection-start-column="78" selection-end-line="47" selection-end-column="78" />
               <folding>
                 <element signature="e#0#11#0" expanded="true" />
@@ -168,16 +155,17 @@
       <workItem from="1612013746264" duration="136000" />
       <workItem from="1614689374302" duration="2235000" />
       <workItem from="1615038020450" duration="368000" />
+      <workItem from="1615038424507" duration="247000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="5105000" />
+    <option name="totallyTimeSpent" value="5352000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.25799572" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.26066098" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
@@ -266,7 +254,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/test2.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="516">
+        <state relative-caret-position="504">
           <caret line="47" column="78" selection-start-line="47" selection-start-column="78" selection-end-line="47" selection-end-column="78" />
           <folding>
             <element signature="e#0#11#0" expanded="true" />
