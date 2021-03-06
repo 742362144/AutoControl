@@ -1,0 +1,52 @@
+version: '3.4'
+services:
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    hostname: prometheus
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+  prometheus-exporter:
+    image: prom/node-exporter
+    container_name: service
+    hostname: service
+    ports:
+      - 9100:9100
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    hostname: grafana
+    ports:
+      - 3000:3000
+    volumes:  
+      - ./grafana.ini:/etc/grafana/grafana.ini
+  cadvisor:
+    image: google/cadvisor:latest
+    container_name: cadvisor
+    privileged: true
+    hostname: cadvisor
+    ports:
+      - 8080:8080
+    volumes:
+      - /:/rootfs:ro
+      - /dev/kmsg:/dev/kmsg:rw
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    depends_on:
+      - storageloc
+  storageloc:
+    image: storageloc
+    container_name: storageloc
+    ports:
+      - 6379:6379
+  redis_exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis_exporter
+#    hostname: redis_exporter
+    network_mode: "host"
+#    ports:
+#      - 9121:9121
+
