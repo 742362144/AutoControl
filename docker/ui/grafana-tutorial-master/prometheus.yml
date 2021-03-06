@@ -10,4 +10,4 @@ scrape_configs:
   - targets: ['cadvisor:8080'] # NOT localhost since we named the host of service in docker-compose file
 - job_name: redis
   static_configs:
-  - targets: ['redis_exporter:9121'] # NOT localhost since we named the host of service in docker-compose file
+  - targets: ['133.133.135.22:9121'] # NOT localhost since we named the host of service in docker-compose file
